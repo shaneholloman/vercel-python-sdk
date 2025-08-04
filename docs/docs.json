@@ -49,7 +49,7 @@
           },
           {
             "group": "Tools",
-            "pages": ["sdk/tool"]
+            "pages": ["sdk/tool", "sdk/agent"]
           },
           {
             "group": "Providers",

@@ -5,6 +5,7 @@ from .generate_object import generate_object, stream_object
 from .providers.openai import openai
 from .tool import tool, Tool
 from .providers.anthropic import anthropic
+from .agent import Agent
 
 """Public entry-point for the *Python* port of Vercel's AI SDK.
 
@@ -27,4 +28,5 @@ __all__ = [
     "anthropic",
     "tool",
     "Tool",
+    "Agent",
 ]

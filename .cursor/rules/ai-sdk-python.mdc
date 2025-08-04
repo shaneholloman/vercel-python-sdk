@@ -1,8 +1,7 @@
 ---
-globs: src/*
+globs: src/*.py
 alwaysApply: false
 ---
-
 # AI SDK Python Codebase Rules
 
 You are working with the AI SDK Python codebase - a pure Python re-implementation of Vercel's popular AI SDK for TypeScript. This codebase provides zero-configuration functions that work consistently across AI providers with first-class streaming, tool-calling, and structured output support.

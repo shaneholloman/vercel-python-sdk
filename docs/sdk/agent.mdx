@@ -1,0 +1,284 @@
+---
+title: "Agent"
+description: "Create AI agents with persistent state, system prompts, and tool-calling capabilities."
+icon: "robot"
+---
+
+import { Note, Tip, Warning, CodeGroup, Steps, Step, Card, CardGroup } from "mintlify/components";
+
+## Overview
+
+The `Agent` class provides a higher-level abstraction for building AI agents with persistent state, system prompts, and tool-calling capabilities. It wraps the core `generate_text` and `stream_text` functions with a more convenient interface for multi-turn conversations and agent workflows. Each agent has a unique name for identification and logging purposes.
+
+## Key Features
+
+- **Named Agents**: Each agent has a unique name for identification and logging
+- **Persistent State**: Maintains system prompts and tool configurations across multiple interactions
+- **Tool Integration**: Seamlessly works with the tool-calling system
+- **Streaming Support**: Both synchronous and streaming interfaces
+- **Step Monitoring**: Optional callback for monitoring agent progress
+- **Safety Controls**: Configurable maximum steps to prevent infinite loops
+
+## Basic Usage
+
+### Environment Setup
+
+Make sure you have your API keys set up in a `.env` file:
+
+```bash
+# .env
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+```
+
+### Creating an Agent
+
+```python
+import os
+from dotenv import load_dotenv
+from ai_sdk import Agent, openai, tool
+
+# Load environment variables
+load_dotenv()
+
+# Define a simple tool
+def get_weather(location: str) -> str:
+    return f"Sunny and 75°F in {location}"
+
+get_weather = tool(
+    name="get_weather",
+    description="Get the current weather for a location",
+    parameters={
+        "type": "object",
+        "properties": {
+            "location": {"type": "string", "description": "City name"}
+        },
+        "required": ["location"]
+    },
+    execute=get_weather
+)
+
+# Create an agent
+model = openai("gpt-4o-mini")
+agent = Agent(
+    name="Weather Assistant",
+    model=model,
+    system="You are a helpful weather assistant. Always provide accurate weather information.",
+    tools=[get_weather]
+)
+```
+
+### Running the Agent
+
+```python
+# Simple text generation
+response = agent.run("What's the weather like in San Francisco?")
+print(response)
+# Output: "Let me check the weather in San Francisco for you.
+# The current weather in San Francisco is Sunny and 75°F."
+```
+
+### Streaming with the Agent
+
+```python
+import asyncio
+
+async def main():
+    stream = agent.stream("What's the weather like in New York?")
+
+    async for chunk in stream.text_stream:
+        print(chunk, end="", flush=True)
+
+asyncio.run(main())
+```
+
+## Advanced Configuration
+
+### Step Monitoring
+
+Use the `on_step` callback to monitor the agent's progress:
+
+```python
+from ai_sdk.types import OnStepFinishResult
+
+def log_step(step_info: OnStepFinishResult):
+    print(f"Agent step: {step_info.step_type}")
+    print(f"Tool calls: {len(step_info.tool_calls)}")
+    print(f"Tool results: {len(step_info.tool_results)}")
+
+agent = Agent(
+    name="Weather Assistant",
+    model=model,
+    system="You are a helpful assistant.",
+    tools=[get_weather],
+    on_step=log_step
+)
+```
+
+<Tip>
+  You can also use the built-in `print_step` function from `ai_sdk.agent` for detailed step
+  monitoring.
+</Tip>
+
+### Safety Controls
+
+Set maximum steps to prevent infinite tool-calling loops:
+
+```python
+agent = Agent(
+    name="Weather Assistant",
+    model=model,
+    system="You are a helpful assistant.",
+    tools=[get_weather],
+    max_steps=5  # Stop after 5 tool calls
+)
+```
+
+## Complete Example
+
+Here's a complete example of a multi-tool agent:
+
+```python
+import os
+from dotenv import load_dotenv
+from ai_sdk import Agent, openai, tool
+from pydantic import BaseModel, Field
+
+# Load environment variables
+load_dotenv()
+
+# Define tool parameters with Pydantic
+class CalculatorParams(BaseModel):
+    operation: str = Field(description="Mathematical operation: add, subtract, multiply, divide")
+    a: float = Field(description="First number")
+    b: float = Field(description="Second number")
+
+def calculator(operation: str, a: float, b: float) -> float:
+    if operation == "add":
+        return a + b
+    elif operation == "subtract":
+        return a - b
+    elif operation == "multiply":
+        return a * b
+    elif operation == "divide":
+        return a / b if b != 0 else "Error: Division by zero"
+    else:
+        return "Error: Invalid operation"
+
+calculator = tool(
+    name="calculator",
+    description="Perform basic mathematical operations",
+    parameters=CalculatorParams,
+    execute=calculator
+)
+
+def get_weather(location: str) -> str:
+    return f"Sunny and 75°F in {location}"
+
+get_weather = tool(
+    name="get_weather",
+    description="Get weather information for a location",
+    parameters={
+        "type": "object",
+        "properties": {
+            "location": {"type": "string", "description": "City name"}
+        },
+        "required": ["location"]
+    },
+    execute=get_weather
+)
+
+# Create the agent
+model = openai("gpt-4o-mini")
+agent = Agent(
+    name="Multi-Tool Assistant",
+    model=model,
+    system="""You are a helpful assistant that can perform calculations and provide weather information.
+    Always be polite and provide clear explanations for your responses.""",
+    tools=[calculator, get_weather],
+    max_steps=10
+)
+
+# Use the agent
+response = agent.run("What's 15 * 7, and what's the weather like in Tokyo?")
+print(response)
+```
+
+## API Reference
+
+### Agent Constructor
+
+```python
+Agent(
+    name: str,
+    model: LanguageModel,
+    system: str = "",
+    tools: List[Tool] = [],
+    on_step: Callable[[OnStepFinishResult], None] = None,
+    max_steps: int = 100
+)
+```
+
+| Parameter   | Type                                   | Default  | Description                                     |
+| ----------- | -------------------------------------- | -------- | ----------------------------------------------- |
+| `name`      | `str`                                  | Required | The name of the agent                           |
+| `model`     | `LanguageModel`                        | Required | The language model to use for generation        |
+| `system`    | `str`                                  | `""`     | System prompt that defines the agent's behavior |
+| `tools`     | `List[Tool]`                           | `[]`     | List of tools the agent can use                 |
+| `on_step`   | `Callable[[OnStepFinishResult], None]` | `None`   | Optional callback for monitoring agent steps    |
+| `max_steps` | `int`                                  | `100`    | Maximum number of tool-calling steps allowed    |
+
+### Methods
+
+#### `run(user_input: str) -> str`
+
+Synchronously generate a response to user input.
+
+```python
+response = agent.run("What's 2 + 2?")
+print(response)  # "The answer is 4."
+```
+
+#### `stream(user_input: str) -> StreamTextResult`
+
+Stream a response to user input.
+
+```python
+stream = agent.stream("Tell me a story")
+async for chunk in stream.text_stream:
+    print(chunk, end="", flush=True)
+```
+
+## Best Practices
+
+<Tip>
+  Use descriptive system prompts to define your agent's personality and capabilities clearly.
+</Tip>
+
+<Tip>
+  Set appropriate `max_steps` limits to prevent runaway tool-calling loops, especially with complex
+  tool chains.
+</Tip>
+
+<Tip>Use the `on_step` callback for debugging and monitoring agent behavior in production.</Tip>
+
+<Warning>
+  Always validate tool inputs and handle errors gracefully in your tool implementations.
+</Warning>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Tool Calling" href="/ai-sdk/tool-calling" icon="wrench">
+    Learn how to define and use tools with the AI SDK.
+  </Card>
+  <Card title="Text Generation" href="/ai-sdk/text-generation" icon="comment-dots">
+    Understand the core text generation capabilities.
+  </Card>
+  <Card title="Streaming" href="/ai-sdk/stream_text" icon="waveform">
+    Learn about streaming responses for real-time interactions.
+  </Card>
+  <Card title="Providers" href="/ai-sdk/providers" icon="server">
+    Explore different language model providers and configurations.
+  </Card>
+</CardGroup>{" "}

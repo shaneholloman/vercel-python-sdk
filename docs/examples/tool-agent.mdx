@@ -4,9 +4,9 @@ description: "Let the model call real Python functions to answer user queries."
 icon: "robot"
 ---
 
-import { Steps, Step, CodeGroup, Tip } from "mintlify/components";
+import { Steps, Step, CodeGroup, Tip, Note } from "mintlify/components";
 
-This example shows a minimal agent that can **add** two numbers using a Python tool.
+This example shows how to create agents that can call real Python functions. We'll demonstrate both the low-level approach and the preferred **Agent** class approach.
 
 <Steps>
 <Step title="Define the tool">
@@ -31,30 +31,58 @@ add = tool(
 
 </Step>
 
-<Step title="Interact with the agent">
+<Step title="Using the Agent class (Recommended)">
 
-<CodeGroup>
-```python agent.py
+The **Agent** class provides a more convenient interface with persistent state and better organization:
+
+```python
+from ai_sdk import Agent, openai
+from tools import add
+
+model = openai("gpt-4.1-mini", temperature=0)
+agent = Agent(
+    name="Math Assistant",
+    model=model,
+    system="You are a helpful math assistant.",
+    tools=[add]
+)
+
+response = agent.run("What is 21 + 21?")
+print(response)  # "The result is 42."
+```
+
+<Note>
+  The Agent class is the **recommended approach** for most use cases. It provides persistent state,
+  better error handling, and a cleaner interface for multi-turn conversations.
+</Note>
+
+</Step>
+
+<Step title="Low-level approach (Advanced)">
+
+For advanced use cases, you can use the lower-level `generate_text` function directly:
+
+```python
 from ai_sdk import openai, generate_text
 from tools import add  # assume above code lives in tools.py
 
 model = openai("gpt-4.1-mini", temperature=0)
 
 res = generate_text(
-model=model,
-prompt="What is 21 + 21?",
-tools=[add],
+    model=model,
+    prompt="What is 21 + 21?",
+    tools=[add],
 )
 print(res.text) # "The result is 42."
 print(res.tool_calls) # introspection
 print(res.tool_results)
-
 ```
-</CodeGroup>
+
 </Step>
+
 </Steps>
 
 <Tip>
-The SDK automatically loops until the model stops requesting tools (max 8 iterations by default). Each tool result is appended as a **tool message** so the model can reference previous calls.
+  The SDK automatically loops until the model stops requesting tools (max 8 iterations by default).
+  Each tool result is appended as a **tool message** so the model can reference previous calls.
 </Tip>
-```

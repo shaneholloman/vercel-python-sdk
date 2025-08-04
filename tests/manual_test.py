@@ -1,4 +1,4 @@
-Sw# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Manual demo script – extended with *tool calling* showcase
 # ---------------------------------------------------------------------------
 
@@ -24,6 +24,7 @@ from ai_sdk import (
     embed_many,
     cosine_similarity,
     anthropic,
+    Agent,
 )
 from ai_sdk.types import CoreSystemMessage, CoreUserMessage, TextPart
 from pydantic import BaseModel, Field
@@ -42,7 +43,7 @@ class DoubleParams(BaseModel):
 
 
 def _double_exec(x: int) -> int:  # noqa: D401
-    print(f"Double called with {x}")
+    print(f"[DOUBLE_TOOL]Double called with {x}")
     return x * 2
 
 
@@ -51,6 +52,45 @@ double_tool = tool(
     description="Double the given integer.",
     parameters=DoubleParams,
     execute=_double_exec,
+)
+
+
+class FindCapitalParams(BaseModel):
+    country: str = Field(description="Country to find the capital of")
+
+
+def _find_capital_exec(country: str) -> str:  # noqa: D401
+    print(f"[FIND_CAPITAL_TOOL] Find capital called with {country}")
+    if country == "France":
+        return "The capital of France is Paris."
+    elif country == "Germany":
+        return "The capital of Germany is Berlin."
+    elif country == "Italy":
+        return "The capital of Italy is Rome."
+    elif country == "Spain":    
+        return "The capital of Spain is Madrid."
+    else:   
+        return "I don't know the capital of that country."
+
+find_capital_tool = tool(
+    name="find_capital",
+    description="Find the capital of the given country.",
+    parameters=FindCapitalParams,
+    execute=_find_capital_exec,
+)
+
+class CountLettersParams(BaseModel):
+    text: str = Field(description="Text to count the letters of")
+
+def _count_letters_exec(text: str) -> int:  # noqa: D401
+    print(f"[COUNT_LETTERS_TOOL] Count letters called with {text}")
+    return len(text)
+
+count_letters_tool = tool(
+    name="count_letters",
+    description="Count the number of letters in the given text.",
+    parameters=CountLettersParams,
+    execute=_count_letters_exec,
 )
 
 
@@ -188,17 +228,29 @@ async def demo_embed(_):
     print("Cosine similarity of third and fourth:", sim3)
 
 
+async def demo_agent(model):
+    print("\n-- Agent example --")
+    agent = Agent(
+        name="Test Agent",
+        model=model, 
+        tools=[find_capital_tool, count_letters_tool, double_tool]
+    )
+
+    print(agent.run("Find the capitals of France, Germany, Italy, and Spain and return the double of the number of letters in each capital."))
+
+
 async def main():
     # model = openai(MODEL_ID)
     model = anthropic(MODEL_ID, api_key=os.getenv("ANTHROPIC_API_KEY"))
-    await demo_generate_prompt(model)
-    await demo_generate_messages(model)
-    await demo_stream(model)
-    await demo_tool_call(model)
-    await demo_tool_call_streaming(model)
-    await demo_generate_object(model)
-    await demo_stream_object(model)
-    await demo_embed(model)
+    # await demo_generate_prompt(model)
+    # await demo_generate_messages(model)
+    # await demo_stream(model)
+    # await demo_tool_call(model)
+    # await demo_tool_call_streaming(model)
+    # await demo_generate_object(model)
+    # await demo_stream_object(model)
+    # await demo_embed(model)
+    await demo_agent(model)
 
 
 if __name__ == "__main__":
