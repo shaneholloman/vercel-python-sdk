@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, Union, Type
 import inspect
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel
 
 HandlerFn = Callable[..., Union[Any, Awaitable[Any]]]
 

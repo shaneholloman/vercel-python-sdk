@@ -5,19 +5,23 @@ Usage: tool_calling_example.py --a INT --b INT [--provider openai|anthropic] [--
 """
 
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import argparse
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from ai_sdk import openai, anthropic, generate_text, tool
 
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
 
 # ---------------------------------------------------------------------------
 # Tool definitions with both JSON schema and Pydantic models
 # ---------------------------------------------------------------------------
+
 
 # JSON Schema approach (legacy)
 def add_exec(a: int, b: int) -> int:
@@ -95,11 +99,11 @@ class UserProfileParams(BaseModel):
 
 
 def create_user_profile_exec(
-    name: str, 
-    age: int, 
-    email: Optional[str] = None, 
-    interests: List[str] = None, 
-    is_active: bool = True
+    name: str,
+    age: int,
+    email: Optional[str] = None,
+    interests: Optional[List[str]] = None,
+    is_active: bool = True,
 ) -> dict:
     """Create a new user profile."""
     return {
@@ -109,7 +113,7 @@ def create_user_profile_exec(
         "email": email,
         "interests": interests or [],
         "is_active": is_active,
-        "created_at": "2024-01-01T00:00:00Z"
+        "created_at": "2024-01-01T00:00:00Z",
     }
 
 
@@ -122,14 +126,23 @@ user_profile_tool = tool(
 
 
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(description="Tool calling CLI using ai-sdk.")
     parser.add_argument("--a", type=int, required=True, help="First integer.")
     parser.add_argument("--b", type=int, required=True, help="Second integer.")
     parser.add_argument("--provider", choices=["openai", "anthropic"], default="openai")
     parser.add_argument("--model", default=os.getenv("AI_SDK_MODEL", "gpt-4o-mini"))
-    parser.add_argument("--use-pydantic", action="store_true", help="Use Pydantic model instead of JSON schema")
-    parser.add_argument("--demo", choices=["add", "calculator", "user-profile"], default="add", 
-                       help="Demo to run")
+    parser.add_argument(
+        "--use-pydantic",
+        action="store_true",
+        help="Use Pydantic model instead of JSON schema",
+    )
+    parser.add_argument(
+        "--demo",
+        choices=["add", "calculator", "user-profile"],
+        default="add",
+        help="Demo to run",
+    )
     args = parser.parse_args()
 
     client = openai if args.provider == "openai" else anthropic
@@ -149,11 +162,15 @@ def main():
         prompt = f"Use the calculator tool to multiply {args.a} and {args.b}."
     elif args.demo == "user-profile":
         tool_to_use = user_profile_tool
-        prompt = f"Create a user profile for Alice, age 30, with interests in Python and AI."
+        prompt = (
+            "Create a user profile for Alice, age 30, with interests in Python and AI."
+        )
     else:
         raise ValueError(f"Unknown demo: {args.demo}")
 
-    print(f"Running {args.demo} demo with {'Pydantic' if args.use_pydantic else 'JSON schema'} approach...")
+    print(
+        f"Running {args.demo} demo with {'Pydantic' if args.use_pydantic else 'JSON schema'} approach..."
+    )
     print(f"Provider: {args.provider}, Model: {args.model}")
     print(f"Prompt: {prompt}")
     print("-" * 50)

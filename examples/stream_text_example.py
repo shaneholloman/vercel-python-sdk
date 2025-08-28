@@ -5,16 +5,20 @@ Usage: stream_text_example.py --prompt "Your prompt" [--provider openai|anthropi
 """
 
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import argparse
 import asyncio
 from ai_sdk import openai, anthropic, stream_text
 
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
 
 async def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(
         description="Streaming completion CLI using ai-sdk."
     )

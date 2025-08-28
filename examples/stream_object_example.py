@@ -5,14 +5,17 @@ Usage: stream_object_example.py --username USERNAME [--provider openai|anthropic
 """
 
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import argparse
 import asyncio
 from pydantic import BaseModel
 from ai_sdk import openai, anthropic, stream_object
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+
+    def load_dotenv() -> None:  # type: ignore
+        return None
 
 
 class UserProfile(BaseModel):
@@ -22,6 +25,7 @@ class UserProfile(BaseModel):
 
 
 async def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(
         description="UserProfile streaming CLI using ai-sdk."
     )

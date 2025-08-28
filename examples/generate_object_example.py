@@ -5,13 +5,16 @@ Usage: generate_object_example.py --city CITY [--provider openai|anthropic] [--m
 """
 
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import argparse
 from pydantic import BaseModel
 from ai_sdk import openai, anthropic, generate_object
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+
+    def load_dotenv() -> None:  # type: ignore
+        return None
 
 
 class WeatherReport(BaseModel):
@@ -21,6 +24,7 @@ class WeatherReport(BaseModel):
 
 
 def main():
+    load_dotenv()
     parser = argparse.ArgumentParser(
         description="Weather report JSON generation CLI using ai-sdk."
     )

@@ -1,7 +1,22 @@
 import os
 
-import pytest
-from dotenv import load_dotenv
+try:
+    import pytest  # type: ignore
+except Exception:  # pragma: no cover
+
+    class pytest:  # type: ignore
+        @staticmethod
+        def mark():
+            return None
+
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
 
 from ai_sdk import generate_text, stream_text, generate_object, stream_object, openai
 from ai_sdk.types import (
@@ -15,7 +30,7 @@ load_dotenv()
 
 
 # Skip all tests if OPENAI_API_KEY is missing to avoid network failures in CI
-pytestmark = pytest.mark.skipif(
+pytestmark = pytest.mark.skipif(  # type: ignore[attr-defined]
     not os.getenv("OPENAI_API_KEY"),
     reason="OPENAI_API_KEY environment variable not set",
 )
@@ -24,7 +39,7 @@ MODEL_ID = os.getenv("AI_SDK_TEST_MODEL", "gpt-3.5-turbo")
 model = openai(MODEL_ID)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[attr-defined]
 async def test_generate_text_simple():
     """Basic prompt-only generation returns non-empty text and usage."""
     res = generate_text(model=model, prompt="Hello! Respond with the word 'hi'.")
@@ -34,7 +49,7 @@ async def test_generate_text_simple():
     assert res.usage.total_tokens >= 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[attr-defined]
 async def test_generate_text_with_messages():
     """Generation using typed Core*Message list."""
     messages = [
@@ -45,7 +60,7 @@ async def test_generate_text_with_messages():
     assert "yes" in res.text.lower()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[attr-defined]
 async def test_stream_text_iterable():
     """stream_text yields multiple deltas and assembles full text correctly."""
     result = stream_text(model=model, prompt="Repeat the word foo five times.")
@@ -67,7 +82,7 @@ class AckSchema(BaseModel):
     ack: str
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[attr-defined]
 async def test_generate_object_simple():
     """generate_object returns parsed Pydantic model instance."""
 
@@ -82,7 +97,7 @@ async def test_generate_object_simple():
     assert "ack" in res.raw_text.lower()
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[attr-defined]
 async def test_stream_object_iterable():
     """stream_object yields chunks and returns full object on completion."""
 

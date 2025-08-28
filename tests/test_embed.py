@@ -1,19 +1,28 @@
 import os
 import math
 
-import pytest
+try:
+    import pytest  # type: ignore
+except Exception:  # pragma: no cover
+
+    class pytest:  # type: ignore
+        @staticmethod
+        def mark():
+            return None
+
 
 from ai_sdk import embed_many, embed  # type: ignore
 from ai_sdk.embed import cosine_similarity
 from ai_sdk.providers.openai import embedding as _embedding  # Import factory
 
 # Skip real OpenAI calls if key missing
-pytestmark = pytest.mark.skipif(
+pytestmark = pytest.mark.skipif(  # type: ignore[attr-defined]
     not os.getenv("OPENAI_API_KEY"),
     reason="OPENAI_API_KEY environment variable not set",
 )
 
 MODEL_ID = os.getenv("AI_SDK_EMBED_MODEL", "text-embedding-3-small")
+
 
 def _get_model():
     return _embedding(MODEL_ID)

@@ -26,7 +26,20 @@ from ai_sdk import (
     anthropic,
     Agent,
 )
-from ai_sdk.types import CoreSystemMessage, CoreUserMessage, TextPart
+from ai_sdk.types import CoreSystemMessage, CoreUserMessage, TextPart, AnyMessage
+from ai_sdk.ui_stream import (
+    UIStreamStartPart,
+    UITextStartPart,
+    UITextDeltaPart,
+    UITextEndPart,
+    UIFinishMessagePart,
+    UIErrorPart,
+    StartStepPart,
+    FinishStepPart,
+    ToolInputStartPart,
+    ToolInputAvailablePart,
+    ToolOutputAvailablePart,
+)
 from pydantic import BaseModel, Field
 
 
@@ -67,10 +80,11 @@ def _find_capital_exec(country: str) -> str:  # noqa: D401
         return "The capital of Germany is Berlin."
     elif country == "Italy":
         return "The capital of Italy is Rome."
-    elif country == "Spain":    
+    elif country == "Spain":
         return "The capital of Spain is Madrid."
-    else:   
+    else:
         return "I don't know the capital of that country."
+
 
 find_capital_tool = tool(
     name="find_capital",
@@ -79,12 +93,15 @@ find_capital_tool = tool(
     execute=_find_capital_exec,
 )
 
+
 class CountLettersParams(BaseModel):
     text: str = Field(description="Text to count the letters of")
+
 
 def _count_letters_exec(text: str) -> int:  # noqa: D401
     print(f"[COUNT_LETTERS_TOOL] Count letters called with {text}")
     return len(text)
+
 
 count_letters_tool = tool(
     name="count_letters",
@@ -103,7 +120,7 @@ async def demo_generate_prompt(model):
 
 async def demo_generate_messages(model):
     print("\n-- Message-based generate_text --")
-    messages = [
+    messages: List[AnyMessage] = [
         CoreSystemMessage(content="You are a helpful assistant."),
         CoreUserMessage(content=[TextPart(text="Respond with the single word 'ack'.")]),
     ]
@@ -122,6 +139,50 @@ async def demo_stream(model):
     full = await result.text()
     print("Full:", full)
     assert full == "".join(collected)
+
+
+async def demo_full_stream(model):
+    print("\n-- Full stream (typed data stream) example --")
+    result = stream_text(model=model, prompt="Tell a short Python joke.")
+
+    if result.fullStream is None:
+        print("fullStream not available for this result")
+        return
+
+    # Print only text deltas from the full, typed stream
+    try:
+        async for part in result.fullStream:
+            if isinstance(part, UIStreamStartPart):
+                pass  # could initialize UI state
+            elif isinstance(part, StartStepPart):
+                print("[start-step]")
+            elif isinstance(part, ToolInputStartPart):
+                print(f"[tool-input-start] {part.tool_name} {part.tool_call_id}")
+            elif isinstance(part, ToolInputAvailablePart):
+                print(
+                    f"[tool-input-available] {part.tool_name} {part.tool_call_id} {part.input}"
+                )
+            elif isinstance(part, UITextStartPart):
+                pass
+            elif isinstance(part, UITextDeltaPart):
+                print(part.delta, end="", flush=True)
+            elif isinstance(part, UITextEndPart):
+                print()
+            elif isinstance(part, ToolOutputAvailablePart):
+                print(f"[tool-output-available] {part.tool_call_id} {part.output}")
+            elif isinstance(part, FinishStepPart):
+                print("[finish-step]")
+            elif isinstance(part, UIFinishMessagePart):
+                pass
+            elif isinstance(part, UIErrorPart):
+                print(f"[error] {part.error_text}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[stream error] {exc}")
+        return
+
+    # Show assembled full text as well
+    full = await result.text()
+    print("Full:", full)
 
 
 async def demo_tool_call(model):
@@ -232,16 +293,65 @@ async def demo_agent(model):
     print("\n-- Agent example --")
     agent = Agent(
         name="Test Agent",
-        model=model, 
-        tools=[find_capital_tool, count_letters_tool, double_tool]
+        model=model,
+        tools=[find_capital_tool, count_letters_tool, double_tool],
     )
 
-    print(agent.run("Find the capitals of France, Germany, Italy, and Spain and return the double of the number of letters in each capital."))
+    print(
+        agent.run(
+            "Find the capitals of France, Germany, Italy, and Spain and return the double of the number of letters in each capital."
+        )
+    )
+
+
+async def demo_full_stream_with_tools(model):
+    print("\n-- Full stream with tools (typed data stream) --")
+    result = stream_text(
+        model=model,
+        prompt="Please double 7 using the tool and explain briefly.",
+        tools=[double_tool],
+    )
+
+    if result.fullStream is None:
+        print("fullStream not available for this result")
+        return
+
+    try:
+        async for part in result.fullStream:
+            if isinstance(part, UIStreamStartPart):
+                pass
+            elif isinstance(part, StartStepPart):
+                print("[start-step]")
+            elif isinstance(part, ToolInputStartPart):
+                print(f"[tool-input-start] {part.tool_name} {part.tool_call_id}")
+            elif isinstance(part, ToolInputAvailablePart):
+                print(
+                    f"[tool-input-available] {part.tool_name} {part.tool_call_id} {part.input}"
+                )
+            elif isinstance(part, UITextStartPart):
+                pass
+            elif isinstance(part, UITextDeltaPart):
+                print(part.delta, end="", flush=True)
+            elif isinstance(part, UITextEndPart):
+                print()
+            elif isinstance(part, ToolOutputAvailablePart):
+                print(f"[tool-output-available] {part.tool_call_id} {part.output}")
+            elif isinstance(part, FinishStepPart):
+                print("[finish-step]")
+            elif isinstance(part, UIFinishMessagePart):
+                pass
+            elif isinstance(part, UIErrorPart):
+                print(f"[error] {part.error_text}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[stream error] {exc}")
+        return
+    full = await result.text()
+    print("Full:", full)
 
 
 async def main():
-    # model = openai(MODEL_ID)
-    model = anthropic(MODEL_ID, api_key=os.getenv("ANTHROPIC_API_KEY"))
+    model = openai(MODEL_ID)
+    # model = anthropic(MODEL_ID, api_key=os.getenv("ANTHROPIC_API_KEY"))
     # await demo_generate_prompt(model)
     # await demo_generate_messages(model)
     # await demo_stream(model)
@@ -250,7 +360,9 @@ async def main():
     # await demo_generate_object(model)
     # await demo_stream_object(model)
     # await demo_embed(model)
-    await demo_agent(model)
+    # await demo_agent(model)
+    await demo_full_stream(model)
+    await demo_full_stream_with_tools(model)
 
 
 if __name__ == "__main__":

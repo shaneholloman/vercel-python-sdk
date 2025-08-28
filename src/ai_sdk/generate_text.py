@@ -20,6 +20,8 @@ from typing import (
 )
 
 import asyncio
+import uuid
+from ai_sdk.ui_stream import AnyUIStreamPart
 
 from .providers.language_model import LanguageModel
 from .types import (
@@ -89,6 +91,9 @@ class StreamTextResult:
     # Futures/promises – populated internally by ``_consume_stream``.
     _text_parts: List[str]
 
+    # Data stream (UI message stream) yielding structured parts
+    full_stream: AsyncIterator["AnyUIStreamPart"] | None = None
+
     # Extended metadata populated when stream ends (if available)
     finish_reason: str | None = None
     usage: Optional[TokenUsage] = None
@@ -100,6 +105,11 @@ class StreamTextResult:
         if not self._text_parts:
             await self._consume_stream()
         return "".join(self._text_parts)
+
+    # Alias to match TS naming on the Python object for convenience
+    @property
+    def fullStream(self) -> AsyncIterator["AnyUIStreamPart"] | None:  # type: ignore[override]
+        return self.full_stream
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -398,7 +408,7 @@ def generate_text(
                             is_error=tool_result.is_error,
                         )
                     ]
-                )
+                ).to_dict()
             )
 
         # Callback for the *tool-result* step.
@@ -487,12 +497,64 @@ def stream_text(
         async def _single_yield() -> AsyncIterator[str]:
             yield final_res.text
 
+        # Build a minimal UI data stream that wraps the single final text
+        async def _single_full_stream() -> AsyncIterator["AnyUIStreamPart"]:
+            from ai_sdk.ui_stream import (
+                UIStreamStartPart,
+                UITextStartPart,
+                UITextDeltaPart,
+                UITextEndPart,
+                UIFinishMessagePart,
+                StartStepPart,
+                FinishStepPart,
+                ToolInputStartPart,
+                ToolInputAvailablePart,
+                ToolOutputAvailablePart,
+            )
+
+            text_id = f"msg_{uuid.uuid4().hex}"
+            yield UIStreamStartPart()
+            # If tools were involved we can stitch a basic step around it
+            if final_res.tool_results or final_res.tool_calls:
+                yield StartStepPart()
+            if final_res.tool_calls:
+                # Emit inputs as available; we do not currently stream tool input deltas
+                for call in final_res.tool_calls or []:
+                    yield ToolInputStartPart(
+                        tool_call_id=call.tool_call_id or "tool-call",
+                        tool_name=call.tool_name or "tool",
+                    )
+                for call in final_res.tool_calls or []:
+                    yield ToolInputAvailablePart(
+                        tool_call_id=call.tool_call_id or "tool-call",
+                        tool_name=call.tool_name or "tool",
+                        input=call.args,
+                    )
+
+            # Final assistant text as one block
+            yield UITextStartPart(id=text_id)
+            if final_res.text:
+                yield UITextDeltaPart(id=text_id, delta=final_res.text)
+            yield UITextEndPart(id=text_id)
+
+            # Emit tool outputs if present
+            if final_res.tool_results:
+                for tr in final_res.tool_results:
+                    yield ToolOutputAvailablePart(
+                        tool_call_id=tr.tool_call_id or "tool-call",
+                        output=tr.result,
+                    )
+            if final_res.tool_results or final_res.tool_calls:
+                yield FinishStepPart()
+            yield UIFinishMessagePart()
+
         return StreamTextResult(
             text_stream=_single_yield(),
             _text_parts=[final_res.text],
             finish_reason=final_res.finish_reason,
             usage=final_res.usage,
             provider_metadata=final_res.provider_metadata,
+            full_stream=_single_full_stream(),
         )
 
     # ------------------------------------------------------------------
@@ -506,7 +568,8 @@ def stream_text(
             for m in messages
         ]
 
-    stream_iter = model.stream_text(
+    # Use a single provider stream and fan-out to both text_stream and full_stream
+    provider_stream = model.stream_text(
         prompt=prompt,
         system=system,
         messages=serialised_messages,
@@ -514,29 +577,73 @@ def stream_text(
     )
 
     captured_parts: List[str] = []
+    text_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
+    data_queue: asyncio.Queue[Optional[str]] = asyncio.Queue()
 
-    async def _capturing_wrapper() -> AsyncIterator[str]:
+    async def _producer() -> None:
         try:
-            async for chunk in stream_iter:
+            async for chunk in provider_stream:
                 captured_parts.append(chunk)
+                # Forward callbacks for text deltas
                 if on_chunk:
                     maybe_cor = on_chunk(chunk)
                     if asyncio.iscoroutine(maybe_cor):
                         await maybe_cor
-                yield chunk
+                # Fan-out to both queues
+                await text_queue.put(chunk)
+                await data_queue.put(chunk)
         except Exception as exc:  # noqa: BLE001
+            # Send error to data stream and propagate
+            await data_queue.put(None)
             if on_error:
                 maybe = on_error(exc)  # type: ignore[arg-type]
                 if asyncio.iscoroutine(maybe):
                     await maybe
             raise
         finally:
+            # Signal termination to both consumers
+            await text_queue.put(None)
+            await data_queue.put(None)
             if on_finish:
                 full_text = "".join(captured_parts)
                 maybe = on_finish(full_text)
                 if asyncio.iscoroutine(maybe):
                     await maybe
 
+    # Start producer in background
+    asyncio.create_task(_producer())
+
+    async def _text_consumer() -> AsyncIterator[str]:
+        while True:
+            item = await text_queue.get()
+            if item is None:
+                break
+            yield item
+
+    async def _full_stream_consumer() -> AsyncIterator["AnyUIStreamPart"]:
+        from ai_sdk.ui_stream import (
+            UIStreamStartPart,
+            UITextStartPart,
+            UITextDeltaPart,
+            UITextEndPart,
+            UIFinishMessagePart,
+        )
+
+        text_id = f"msg_{uuid.uuid4().hex}"
+        yield UIStreamStartPart()
+        yield UITextStartPart(id=text_id)
+
+        while True:
+            item = await data_queue.get()
+            if item is None:
+                break
+            yield UITextDeltaPart(id=text_id, delta=item)
+
+        yield UITextEndPart(id=text_id)
+        yield UIFinishMessagePart()
+
     return StreamTextResult(
-        text_stream=_capturing_wrapper(), _text_parts=captured_parts
+        text_stream=_text_consumer(),
+        _text_parts=captured_parts,
+        full_stream=_full_stream_consumer(),
     )

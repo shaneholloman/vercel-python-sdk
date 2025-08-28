@@ -16,6 +16,7 @@ dependencies = [
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "python-dotenv" },
 ]
 
 [package.metadata]
@@ -25,6 +26,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.2.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.6" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "python-dotenv", marker = "extra == 'dev'", specifier = ">=1.1.1" },
 ]
 provides-extras = ["dev"]
 

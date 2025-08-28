@@ -5,10 +5,16 @@ Usage: generate_text_example.py --prompt "Your prompt" [--provider openai|anthro
 """
 
 import os
-from dotenv import load_dotenv
-
 import argparse
 from ai_sdk import openai, anthropic, generate_text
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
 
 load_dotenv()
 

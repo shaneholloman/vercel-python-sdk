@@ -5,7 +5,14 @@ Usage: embeddings_example.py --values VAL1 VAL2 [VAL3 ...] [--model MODEL_ID]
 
 import os
 import argparse
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except Exception:  # pragma: no cover
+
+    def load_dotenv() -> None:  # type: ignore
+        return None
+
 
 from ai_sdk import openai, embed_many, cosine_similarity  # type: ignore[attr-defined]
 
