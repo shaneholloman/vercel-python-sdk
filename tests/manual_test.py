@@ -43,7 +43,7 @@ from ai_sdk.ui_stream import (
 from pydantic import BaseModel, Field
 
 
-MODEL_ID = os.getenv("AI_SDK_TEST_MODEL", "claude-3-5-haiku-latest")
+MODEL_ID = os.getenv("AI_SDK_TEST_MODEL", "gpt-5")
 
 
 # ---------------------------------------------------------------------------
