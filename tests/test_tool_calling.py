@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 
 from ai_sdk import generate_text, tool
 from ai_sdk.providers.language_model import LanguageModel
-from ai_sdk.types import CoreToolMessage
+
 
 # ---------------------------------------------------------------------------
 # Dummy provider – emulates tool calling behaviour without external network
@@ -69,9 +69,30 @@ class DummyModel(LanguageModel):
             # The dummy model *echoes* whatever the tool result was.  In a real
             # conversation the LLM would continue reasoning here.
             last_tool_msg = (
-                messages[-1] if messages else CoreToolMessage(role="tool", content=[])
+                messages[-1] if messages else {"role": "tool", "content": []}
             )
-            result_value = json.loads(last_tool_msg.content[0].result)
+            # Handle both dict and object access for robust testing
+            content = last_tool_msg.get("content") if isinstance(last_tool_msg, dict) else last_tool_msg.content
+            
+            # Content might be a list of ToolResult objects or dicts
+            first_content = content[0]
+            if hasattr(first_content, "result"):
+                result_val = first_content.result
+            elif isinstance(first_content, dict):
+                result_val = first_content["result"]
+            else:
+                # Fallback if it's already the result value (simpler mocks)
+                result_val = first_content
+                
+            # If result is json string, load it
+            if isinstance(result_val, str):
+                try:
+                    result_value = json.loads(result_val)
+                except Exception:
+                    result_value = result_val
+            else:
+                result_value = result_val
+
             return {
                 "text": str(result_value),
                 "finish_reason": "stop",
@@ -173,12 +194,13 @@ def test_tool_with_pydantic_model():
     assert "x" in schema["required"]
 
 
-def test_tool_execution_with_validation():
+@pytest.mark.asyncio
+async def test_tool_execution_with_validation():
     """Test that tool execution validates inputs against Pydantic model."""
     # Valid input
-    result = double_tool.run(x=5)
+    result = await double_tool.run(x=5)
     assert result == 10
 
     # Invalid input should raise validation error
     with pytest.raises(Exception):  # Pydantic validation error
-        double_tool.run(x="not an integer")
+        await double_tool.run(x="not an integer")

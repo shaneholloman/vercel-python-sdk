@@ -12,6 +12,7 @@ The public API of these classes stays **exactly** the same compared to the
 previous dataclass-based implementation, so no changes are required in
 existing downstream code.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

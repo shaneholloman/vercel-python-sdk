@@ -56,7 +56,7 @@ class GeminiModel(LanguageModel):
         choice = resp.choices[0]
         text = choice.message.content or ""
         finish_reason = choice.finish_reason or "unknown"
-        
+
         # Extract tool_calls if present
         tool_calls = []
         if getattr(choice.message, "tool_calls", None):
@@ -106,9 +106,11 @@ class GeminiModel(LanguageModel):
 
         # Use AsyncOpenAI for streaming to avoid threading issues
         from openai import AsyncOpenAI
-        
-        async_client = AsyncOpenAI(api_key=self._client.api_key, base_url=self._client.base_url)
-        
+
+        async_client = AsyncOpenAI(
+            api_key=self._client.api_key, base_url=self._client.base_url
+        )
+
         async def _generator() -> AsyncIterator[str]:
             stream = await async_client.chat.completions.create(
                 model=self._model,
@@ -121,7 +123,7 @@ class GeminiModel(LanguageModel):
                 content = getattr(delta, "content", None)
                 if content:
                     yield content
-            
+
             await async_client.close()
 
         return _generator()

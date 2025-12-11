@@ -1,7 +1,6 @@
 import os
 import pytest
 from ai_sdk import gemini, generate_text, stream_text, generate_object
-from pydantic import BaseModel
 from dotenv import load_dotenv
 from ai_sdk.tool import tool
 from pydantic import BaseModel, Field
@@ -15,6 +14,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 MODEL_ID = "gemini-2.5-flash"
+
 
 @pytest.fixture
 def model():
@@ -60,20 +60,18 @@ async def test_gemini_generate_object(model):
     assert isinstance(res.object, MathResponse)
     assert res.object.answer == 4
 
+
 class AddParams(BaseModel):
     a: float = Field(description="First number")
     b: float = Field(description="Second number")
 
-@tool(
-    name="add",
-    description="Add two numbers.",
-    parameters=AddParams
-)
+
+@tool(name="add", description="Add two numbers.", parameters=AddParams)
 def add_tool(a: float, b: float) -> float:
     return a + b
 
 
-@pytest.mark.asyncio 
+@pytest.mark.asyncio
 async def test_gemini_tool_call(model):
     """Tool call generation."""
     res = generate_text(
@@ -84,4 +82,3 @@ async def test_gemini_tool_call(model):
         ],
     )
     assert "6" in res.text
-    

@@ -23,7 +23,6 @@ from ai_sdk import (
     tool,
     embed_many,
     cosine_similarity,
-    anthropic,
     Agent,
 )
 from ai_sdk.types import CoreSystemMessage, CoreUserMessage, TextPart, AnyMessage

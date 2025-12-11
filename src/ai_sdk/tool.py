@@ -20,10 +20,10 @@ that implements the tool logic::
 
     # Or using Pydantic models for better type safety:
     from pydantic import BaseModel
-    
+
     class DoubleParams(BaseModel):
         x: int
-    
+
     @tool(name="double", description="Double the given integer.", parameters=DoubleParams)
     def double(x: int) -> int:
         return x * 2
@@ -47,13 +47,13 @@ HandlerFn = Callable[..., Union[Any, Awaitable[Any]]]
 def _pydantic_to_json_schema(model: Type[BaseModel]) -> Dict[str, Any]:
     """Convert a Pydantic model to JSON schema format."""
     schema = model.model_json_schema()
-    
+
     # Ensure we have the required structure for OpenAI function calling
     if "properties" not in schema:
         schema["properties"] = {}
     if "required" not in schema:
         schema["required"] = []
-    
+
     return schema
 
 
@@ -86,7 +86,7 @@ class Tool:  # noqa: D101 – simple value object
         if self._pydantic_model is not None:
             validated_data = self._pydantic_model(**kwargs)
             kwargs = validated_data.model_dump()
-        
+
         result = self.handler(**kwargs)
         if inspect.isawaitable(result):
             return await result  # type: ignore[return-value]
@@ -99,13 +99,13 @@ class Tool:  # noqa: D101 – simple value object
 
 
 def tool(
-    *, 
-    name: str, 
-    description: str, 
-    parameters: Dict[str, Any] | Type[BaseModel], 
-    execute: HandlerFn | None = None
+    *,
+    name: str,
+    description: str,
+    parameters: Dict[str, Any] | Type[BaseModel],
+    execute: HandlerFn | None = None,
 ) -> "Tool" | Callable[[HandlerFn], "Tool"]:  # noqa: D401
-    '''Create a :class:`ai_sdk.tool.Tool` from a Python callable.
+    """Create a :class:`ai_sdk.tool.Tool` from a Python callable.
 
     Parameters
     ----------
@@ -130,7 +130,7 @@ def tool(
     Examples
     --------
     Using JSON schema directly:
-    
+
     >>> @tool(
     ...     name="double",
     ...     description="Double the given integer.",
@@ -144,12 +144,12 @@ def tool(
     ...     return x * 2
 
     Using Pydantic model for better type safety:
-    
+
     >>> from pydantic import BaseModel
-    >>> 
+    >>>
     >>> class DoubleParams(BaseModel):
     ...     x: int
-    ... 
+    ...
     >>> @tool(
     ...     name="double",
     ...     description="Double the given integer.",
@@ -157,12 +157,10 @@ def tool(
     ... )
     ... def double(x: int) -> int:
     ...     return x * 2
-    '''
+    """
 
     if not all([name, description, parameters]):
-        raise ValueError(
-            "'name', 'description', and 'parameters' are required"
-        )
+        raise ValueError("'name', 'description', and 'parameters' are required")
 
     # Handle Pydantic model vs JSON schema
     pydantic_model = None
@@ -179,21 +177,21 @@ def tool(
     # If execute is provided (functional usage), return the Tool immediately
     if execute is not None:
         return Tool(
-            name=name, 
-            description=description, 
-            parameters=parameters_dict, 
+            name=name,
+            description=description,
+            parameters=parameters_dict,
             handler=execute,
-            _pydantic_model=pydantic_model
+            _pydantic_model=pydantic_model,
         )
 
     # Otherwise (decorator usage), return a wrapper that accepts the function
     def wrapper(func: HandlerFn) -> Tool:
         return Tool(
-            name=name, 
-            description=description, 
-            parameters=parameters_dict, 
+            name=name,
+            description=description,
+            parameters=parameters_dict,
             handler=func,
-            _pydantic_model=pydantic_model
+            _pydantic_model=pydantic_model,
         )
-    
+
     return wrapper
