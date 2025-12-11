@@ -3,7 +3,7 @@ Lightweight *tool* helper mirroring the AI SDK TypeScript implementation.
 
 A *Tool* couples a JSON schema (name, description, parameters) with a Python
 handler function.  The :func:`tool` decorator behaves similar to the JavaScript
-version – it takes the manifest as its first call and then expects a function
+version - it takes the manifest as its first call and then expects a function
 that implements the tool logic::
 
     @tool({
@@ -103,8 +103,8 @@ def tool(
     name: str, 
     description: str, 
     parameters: Dict[str, Any] | Type[BaseModel], 
-    execute: HandlerFn
-) -> "Tool":  # noqa: D401
+    execute: HandlerFn | None = None
+) -> "Tool" | Callable[[HandlerFn], "Tool"]:  # noqa: D401
     '''Create a :class:`ai_sdk.tool.Tool` from a Python callable.
 
     Parameters
@@ -159,9 +159,9 @@ def tool(
     ...     return x * 2
     '''
 
-    if not all([name, description, parameters, execute]):
+    if not all([name, description, parameters]):
         raise ValueError(
-            "'name', 'description', 'parameters', and 'execute' are required"
+            "'name', 'description', and 'parameters' are required"
         )
 
     # Handle Pydantic model vs JSON schema
@@ -176,10 +176,24 @@ def tool(
             "parameters must be either a JSON schema dict or a Pydantic model class"
         )
 
-    return Tool(
-        name=name, 
-        description=description, 
-        parameters=parameters_dict, 
-        handler=execute,
-        _pydantic_model=pydantic_model
-    )
+    # If execute is provided (functional usage), return the Tool immediately
+    if execute is not None:
+        return Tool(
+            name=name, 
+            description=description, 
+            parameters=parameters_dict, 
+            handler=execute,
+            _pydantic_model=pydantic_model
+        )
+
+    # Otherwise (decorator usage), return a wrapper that accepts the function
+    def wrapper(func: HandlerFn) -> Tool:
+        return Tool(
+            name=name, 
+            description=description, 
+            parameters=parameters_dict, 
+            handler=func,
+            _pydantic_model=pydantic_model
+        )
+    
+    return wrapper
