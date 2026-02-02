@@ -93,6 +93,7 @@ def cosine_similarity(vec_a: Sequence[float], vec_b: Sequence[float]) -> float: 
 
     return dot / (norm_a * norm_b)
 
+
 # ---------------------------------------------------------------------------
 # Public helpers
 # ---------------------------------------------------------------------------

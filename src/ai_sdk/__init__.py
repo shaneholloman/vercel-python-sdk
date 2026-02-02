@@ -5,6 +5,7 @@ from .generate_object import generate_object, stream_object
 from .providers.openai import openai
 from .tool import tool, Tool
 from .providers.anthropic import anthropic
+from .providers.gemini import gemini
 from .agent import Agent
 
 """Public entry-point for the *Python* port of Vercel's AI SDK.
@@ -26,6 +27,7 @@ __all__ = [
     "cosine_similarity",
     "openai",
     "anthropic",
+    "gemini",
     "tool",
     "Tool",
     "Agent",
