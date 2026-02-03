@@ -1,9 +1,10 @@
 [project]
 name = "ai-sdk-python"
 packages = ["src/ai_sdk"]
-version = "0.1.0"
+version = "0.1.1"
 description = "The easiest, safest, and cleanest way to use AI in your Python code. Inspired by the Vercel AI SDK."
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Asanshay Gupta", email = "asanshay@bharatgupta.com" }
 ]
